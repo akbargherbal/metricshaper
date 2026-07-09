@@ -1,4 +1,3 @@
-# Paste math engine logic here (weight_transforms.py)
 """
 Configurable weight transforms (a.k.a. weight functions / shaping functions).
 
@@ -155,6 +154,8 @@ def clamp(
     min_v: float | None = None, max_v: float | None = None, scale: float = 1.0
 ) -> Transform:
     def f(x):
+        if min_v is None and max_v is None:
+            return scale * x
         return scale * np.clip(x, min_v, max_v)
 
     return Transform("clamp", f, {"min_v": min_v, "max_v": max_v, "scale": scale})
@@ -381,7 +382,7 @@ def compile_pipeline_formulas(
 # Example
 # ---------------------------------------------------------------------------
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     X = [100, 50, 20]
 
     knobs = [

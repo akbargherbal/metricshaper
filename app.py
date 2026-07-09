@@ -104,7 +104,9 @@ def api_popular_values():
     result = [{"value": k, "count": int(v)} for k, v in top.items()]
 
     if request.headers.get("HX-Request"):
-        return render_template("_popular_tags.html", column=column, popular_values=result)
+        return render_template(
+            "_popular_tags.html", column=column, popular_values=result
+        )
 
     return jsonify({"popular_values": result})
 
@@ -159,13 +161,23 @@ def api_compute():
             continue
         if fc["type"] == "categorical":
             filtered_df = filtered_df[filtered_df[col].astype(str) == str(value)]
-        elif fc["type"] == "range" and isinstance(value, (list, tuple)) and len(value) == 2:
+        elif (
+            fc["type"] == "range"
+            and isinstance(value, (list, tuple))
+            and len(value) == 2
+        ):
             lo, hi = value
-            filtered_df = filtered_df[(filtered_df[col] >= lo) & (filtered_df[col] <= hi)]
+            filtered_df = filtered_df[
+                (filtered_df[col] >= lo) & (filtered_df[col] <= hi)
+            ]
 
     if filtered_df.empty:
         return jsonify(
-            {"leaderboard": [], "watchlist": [], "formula": {"latex": "y = 0", "python": "y = 0"}}
+            {
+                "leaderboard": [],
+                "watchlist": [],
+                "formula": {"latex": "y = 0", "python": "y = 0"},
+            }
         )
 
     # 2. Normalize + transform each channel, tracking per-channel contributions
@@ -243,15 +255,29 @@ def api_compute():
                 }
             )
         else:
-            watchlist.append({"id": target, "found": False, "rank": None, "total_score": 0.0, "breakdown": []})
+            watchlist.append(
+                {
+                    "id": target,
+                    "found": False,
+                    "rank": None,
+                    "total_score": 0.0,
+                    "breakdown": [],
+                }
+            )
 
     # 5. Formula, using sanitized column names as variables
-    python_vars = [sanitize_identifier(ch["column"]) for ch, _ in zip(channels_cfg, knobs)]
+    python_vars = [
+        sanitize_identifier(ch["column"]) for ch, _ in zip(channels_cfg, knobs)
+    ]
     latex_vars = [f"\\\\text{{{v}}}" for v in python_vars]
-    formula = compile_pipeline_formulas(knobs, latex_vars=latex_vars, python_vars=python_vars)
+    formula = compile_pipeline_formulas(
+        knobs, latex_vars=latex_vars, python_vars=python_vars
+    )
 
-    return jsonify({"leaderboard": leaderboard, "watchlist": watchlist, \"formula\": formula})
+    return jsonify(
+        {"leaderboard": leaderboard, "watchlist": watchlist, "formula": formula}
+    )
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     app.run(debug=True)

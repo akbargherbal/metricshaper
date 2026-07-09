@@ -1,0 +1,6 @@
+[run]
+omit =
+    scripts/*
+    */site-packages/*
+    tests/*
+    scaffold_tests.py

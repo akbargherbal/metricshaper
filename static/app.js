@@ -39,6 +39,9 @@ export function parseWatchlist(text) {
 }
 
 export function sanitizeNumber(value, fallback) {
+  if (value === "" || (typeof value === "string" && value.trim() === "")) {
+    return fallback;
+  }
   const n = Number(value);
   return Number.isFinite(n) ? n : fallback;
 }

@@ -1,4 +1,3 @@
-# Paste dataset loader class here (dataset_loader.py)
 """
 Loads datasets for the signal shaper from `data/*.pkl`, each paired with an
 explicit `<name>.config.json` sitting next to it.
