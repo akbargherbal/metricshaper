@@ -1,0 +1,11 @@
+<!-- Paste server-side tag template snippet here -->
+{% for item in popular_values %}
+<button
+  type="button"
+  class="px-2 py-1 text-[11px] bg-[#080b11] hover:bg-slate-900 border border-slate-900 hover:border-slate-800 text-slate-300 rounded-md transition font-mono"
+  onclick="const el = document.getElementById('filter-{{ column }}'); if (el) { el.value = {{ item.value | tojson }}; el.dispatchEvent(new Event('change')); }"
+>
+  {{ item.value }}
+  <span class="text-[9px] text-slate-500 font-mono">({{ item.count }})</span>
+</button>
+{% endfor %}

@@ -1,0 +1,187 @@
+<!-- Paste index.html markup here -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Signal Shaper</title>\n<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+<script src="https://unpkg.com/htmx.org@1.9.10"></script>
+<style>
+  .copy-btn{transition:background-color .15s ease}
+  .modal-overlay{backdrop-filter:blur(2px)}
+</style>
+</head>
+<body class="bg-[#0a0d13] text-slate-200 font-sans">
+
+  <div class="max-w-[1400px] mx-auto p-6 space-y-6">
+
+    <!-- HEADER -->
+    <header class="flex justify-between items-center pb-4 border-b border-slate-900">
+      <div>
+        <h1 class="text-lg font-bold tracking-wide text-slate-100">SIGNAL SHAPER</h1>
+        <p id="dataset-tagline" class="text-xs text-slate-500 font-mono mt-0.5">loading dataset...</p>
+      </div>
+      <div class="flex items-center gap-3">
+        {% if dataset_names|length > 1 %}
+        <select id="dataset-select" class="px-3 py-1.5 bg-[#181f2d] border border-slate-900 rounded-lg text-xs font-mono text-slate-300">
+          {% for name in dataset_names %}
+          <option value="{{ name }}" {% if name == active_dataset %}selected{% endif %}>{{ name }}</option>
+          {% endfor %}
+        </select>\n        {% else %}
+        <div class="px-3 py-1.5 bg-[#181f2d] border border-slate-900 rounded-lg text-xs font-mono text-slate-400">
+          dataset: <span class="text-slate-200">{{ active_dataset }}</span>
+        </div>\n        {% endif %}
+        <button id="transform-reference-btn" class="px-3 py-1.5 text-xs font-mono text-slate-400 hover:text-teal-400 border border-slate-900 hover:border-teal-500/30 rounded-lg transition">
+          Transform reference
+        </button>
+      </div>
+    </header>
+
+    <div id="error-banner" class="hidden bg-red-950/40 border border-red-900 text-red-300 text-xs font-mono rounded-lg px-4 py-2"></div>
+
+    <!-- MAIN GRID -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+      <!-- LEFT COLUMN -->
+      <div class="lg:col-span-5 flex flex-col gap-6">
+
+        <!-- FILTERS PANEL -->
+        <div class="bg-[#181f2d] border border-slate-900 rounded-2xl p-5 shadow-[0_10px_20px_rgba(0,0,0,0.3)] space-y-4">
+          <h2 class="text-xs font-mono text-teal-400 tracking-wider uppercase border-b border-slate-800 pb-3 flex items-center gap-2 font-bold">
+            <span class="w-1.5 h-3 bg-teal-500 rounded-sm"></span>
+            FILTERS
+          </h2>
+          <div id="filters-container" class="space-y-4"></div>
+
+          <div class="flex flex-col gap-1.5 border-t border-slate-800 pt-3">
+            <label class="font-mono text-[10px] uppercase tracking-wider text-slate-500 flex justify-between font-bold">
+              <span>Watchlist</span>
+              <span class="text-slate-600 font-light lowercase font-normal">newline separated</span>
+            </label>
+            <textarea id=\"watchlist-input\" rows=\"2\" class=\"bg-[#0e121a] border border-slate-850 text-slate-200 rounded-lg px-3 py-2 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-teal-500/40 shadow-inner\"></textarea>
+          </div>
+
+          <div class="flex flex-col gap-1.5 max-w-[150px]">
+            <label class="font-mono text-[10px] uppercase tracking-wider text-slate-500 font-bold">Top X rows</label>
+            <input type="number" id="top-x-input" min="1" max="200" value="20" class="bg-[#0e121a] border border-slate-850 text-slate-200 rounded-lg px-3 py-1.5 text-xs font-mono shadow-inner">
+          </div>
+        </div>
+
+        <!-- WATCHLIST PANEL -->
+        <div class="bg-[#181f2d] border border-slate-900 rounded-2xl p-5 shadow-[0_10px_20px_rgba(0,0,0,0.3)] space-y-4">
+          <h2 class=\"text-xs font-mono text-teal-400 tracking-wider uppercase border-b border-slate-800 pb-3 flex items-center gap-2 font-bold\">
+            <span class=\"w-1.5 h-3 bg-teal-500 rounded-sm\"></span>
+            WATCHLIST PLACEMENT
+          </h2>
+          <div class="overflow-x-auto border border-slate-900 rounded-lg bg-[#0e121a]/30">
+            <table class="w-full text-left border-collapse font-mono text-xs">
+              <thead>
+                <tr class="bg-[#0e121a] text-slate-400 border-b border-slate-900">
+                  <th class="px-4 py-2 text-left font-sans text-sm font-bold">ITEM</th>
+                  <th class="px-3 py-2 text-center w-16 font-bold">RANK</th>
+                  <th class="px-4 py-2 text-right w-20 text-teal-400 font-bold">SCORE</th>
+                </tr>
+              </thead>
+              <tbody id="watchlist-body" class="divide-y divide-slate-900">
+                <tr><td colspan="3" class="px-4 py-6 text-center text-slate-500 font-mono italic">No items on watchlist.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- RIGHT COLUMN: LEADERBOARD -->
+      <div class="lg:col-span-7 flex flex-col h-full min-h-0">
+        <div class="bg-[#181f2d] border border-slate-900 rounded-2xl p-5 shadow-[0_10px_20px_rgba(0,0,0,0.3)] flex flex-col h-full space-y-4">
+          <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+            <h2 class="text-xs font-mono text-teal-400 tracking-wider uppercase flex items-center gap-2 font-bold">
+              <span class="w-1.5 h-3 bg-teal-500 rounded-sm"></span>
+              LEADERBOARD
+            </h2>
+            <div class="flex items-center gap-2 text-xs text-slate-500 font-mono">
+              <span>SPAN:</span>
+              <span id="score-summary" class="text-teal-400 font-bold">-</span>
+            </div>
+          </div>
+          <div class="overflow-x-auto flex-grow basis-0 min-h-0 overflow-y-auto border border-slate-900 rounded-lg bg-[#0e121a]/30">
+            <table class="w-full text-left border-collapse font-mono text-xs">
+              <thead>
+                <tr class="bg-[#0e121a] text-slate-400 border-b border-slate-900">
+                  <th class="px-3 py-2 text-center w-10 font-bold">RANK</th>
+                  <th class="px-4 py-2 text-left font-sans text-sm font-bold">ITEM</th>
+                  <th class="px-4 py-2 font-bold text-slate-400 w-40">BREAKDOWN</th>
+                  <th class="px-4 py-2 text-right w-20 text-teal-400 font-bold">SCORE</th>
+                </tr>
+              </thead>
+              <tbody id="leaderboard-body" class="divide-y divide-slate-900">
+                <tr><td colspan="4" class="px-4 py-8 text-center text-slate-500 font-mono italic">Loading...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- CHANNEL SHAPER SECTION -->
+    <section class="bg-[#181f2d] border-2 border-slate-800 rounded-2xl p-5 space-y-4 shadow-[0_20px_30px_rgba(0,0,0,0.4)]">
+      <div class="border-b border-slate-800 pb-3 flex justify-between items-center">
+        <h2 class="text-xs font-mono text-slate-300 tracking-wider uppercase font-extrabold flex items-center gap-2">
+          <span class="w-1.5 h-3 bg-teal-500 rounded-sm"></span>
+          <span id="channel-shaper-title">CHANNEL SHAPER</span>
+        </h2>
+        <span class="px-2 py-0.5 text-[9px] font-mono bg-[#0e121a] text-slate-500 rounded font-bold uppercase tracking-wider">dynamic (N channels)</span>
+      </div>
+      <div id="channels" class="grid grid-cols-1 md:grid-cols-4 gap-5" aria-live="polite"></div>
+    </section>
+
+    <!-- FORMULA CONSOLIDATION -->
+    <section class="bg-[#181f2d] border border-slate-900 rounded-2xl p-5 space-y-3 shadow-[0_10px_20px_rgba(0,0,0,0.3)]">
+      <div class="border-b border-slate-800 pb-2">
+        <h2 class="text-xs font-mono text-teal-400 tracking-wider uppercase font-bold flex items-center gap-2">
+          <span class="w-1.5 h-3 bg-teal-500 rounded-sm"></span>
+          SIGNAL CONSOLIDATION (N-TERM SUM)
+        </h2>
+      </div>
+      <div class="bg-[#0e121a] border border-slate-900 rounded-xl p-5 shadow-inner space-y-4">
+        <div class="space-y-1">
+          <div class="flex justify-between items-center">
+            <span class="text-[9px] font-mono text-slate-500 uppercase tracking-wider font-extrabold">LaTeX (rendered):</span>
+            <button class="copy-btn px-2 py-1 text-[10px] font-mono text-slate-400 hover:text-teal-400 hover:bg-slate-900 border border-slate-800 rounded-md" id="copy-latex-btn">copy LaTeX</button>
+          </div>
+          <div id="latex-display" class="bg-[#121620] rounded-lg p-4 border border-slate-800 overflow-x-auto min-h-[70px] flex items-center justify-center text-slate-200 text-base"></div>
+        </div>
+        <div class="space-y-1">
+          <div class="flex justify-between items-center">
+            <span class="text-[9px] font-mono text-slate-500 uppercase tracking-wider font-extrabold">Python / numpy (paste into a notebook):</span>
+            <button class="copy-btn px-2 py-1 text-[10px] font-mono text-slate-400 hover:text-teal-400 hover:bg-slate-900 border border-slate-800 rounded-md" id="copy-python-btn">copy code</button>
+          </div>
+          <div class="bg-[#121620] rounded-lg p-3 border border-slate-800 shadow-inner">
+            <code id="code-display" class="block text-[11px] text-teal-400 whitespace-pre-wrap font-mono"></code>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- TRANSFORM REFERENCE MODAL (educational, decoupled from the main app) -->
+  <div id="transform-modal" class="fixed inset-0 z-50 hidden items-center justify-center modal-overlay bg-black/60 p-6">
+    <div class="bg-[#141924] border border-slate-800 rounded-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col shadow-[0_20px_60px_rgba(0,0,0,0.6)]">
+      <div class="flex justify-between items-center px-5 py-4 border-b border-slate-800">
+        <h3 class="text-xs font-mono text-teal-400 uppercase tracking-wider font-bold">Transform reference</h3>\n        <button id="close-modal-btn" class="text-slate-500 hover:text-slate-300 text-sm font-mono">close &times;</button>\n      </div>
+      <div class="flex flex-1 min-h-0">
+        <div id="modal-tabs" class="w-36 border-r border-slate-800 py-2 flex flex-col shrink-0 overflow-y-auto"></div>
+        <div id="modal-content" class="flex-1 p-5 space-y-4 overflow-y-auto"></div>
+      </div>
+    </div>
+  </div>
+
+  <script id="transform-specs" type="application/json">{{ specs | tojson }}</script>
+  <script>window.ACTIVE_DATASET = {{ active_dataset | tojson }};</script>
+  <script type="module" src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
