@@ -24,6 +24,7 @@ dataset_loader.py / the per-dataset config.json files.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from typing import Callable, Sequence, Union
 
@@ -301,6 +302,9 @@ def from_config(spec: dict) -> Transform:
     This makes knobs JSON-serializable, which is useful for grid search,
     saved presets, learned/optimized parameters, and web APIs.
     """
+    if not isinstance(spec, dict):
+        raise ValueError(f"transform spec must be an object, got {type(spec).__name__}")
+
     spec = dict(spec)
     kind = spec.pop("type", None)
     try:
@@ -308,9 +312,28 @@ def from_config(spec: dict) -> Transform:
     except KeyError:
         raise ValueError(f"unknown transform type: {kind!r}") from None
 
-    # Drop any keys the factory doesn't accept (e.g. stray UI fields)
+    # Drop any keys the factory doesn't accept (e.g. stray UI fields), and
+    # coerce accepted values to finite floats now. Without this, a bad value
+    # (a non-numeric string, NaN, None passed for a required param) doesn't
+    # fail here — it silently builds a closure and only blows up later, as
+    # an opaque numpy/TypeError deep inside the scoring pipeline instead of
+    # a clean, catchable 400 at the API boundary.
     valid_params = TRANSFORM_SPECS[kind]["params"].keys()
-    kwargs = {k: v for k, v in spec.items() if k in valid_params}
+    kwargs = {}
+    for k, v in spec.items():
+        if k not in valid_params or v is None:
+            continue
+        try:
+            fv = float(v)
+        except (TypeError, ValueError):
+            raise ValueError(
+                f"parameter {k!r} for transform {kind!r} must be numeric, got {v!r}"
+            ) from None
+        if not math.isfinite(fv):
+            raise ValueError(
+                f"parameter {k!r} for transform {kind!r} must be finite, got {v!r}"
+            )
+        kwargs[k] = fv
     return factory(**kwargs)
 
 

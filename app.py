@@ -98,6 +98,8 @@ def api_popular_values():
 
     df = ds.df
     if scope_column and scope_value:
+        if scope_column not in df.columns:
+            return jsonify({"error": f"unknown scope_column {scope_column!r}"}), 400
         df = df[df[scope_column].astype(str) == scope_value]
 
     top = df[column].dropna().astype(str).value_counts().head(8)
@@ -134,7 +136,7 @@ def api_compute():
     id_col = ds.config["identifier_column"]
 
     pipeline_specs = data.get("pipeline", [])
-    if len(pipeline_specs) != len(channels_cfg):
+    if not isinstance(pipeline_specs, list) or len(pipeline_specs) != len(channels_cfg):
         return (
             jsonify(
                 {
@@ -152,9 +154,22 @@ def api_compute():
     except Exception as exc:
         return jsonify({"error": f"Invalid transform configuration: {exc}"}), 400
 
+    try:
+        top_x = int(data.get("top_x", 20))
+    except (TypeError, ValueError):
+        return jsonify({"error": "top_x must be an integer"}), 400
+
+    raw_targets = data.get("target_identifiers", [])
+    if not isinstance(raw_targets, list):
+        return jsonify({"error": "target_identifiers must be a list of strings"}), 400
+    targets = [str(t).strip() for t in raw_targets if str(t).strip()]
+
     # 1. Filter
     filtered_df = ds.df
-    active_filters = data.get("filters", {}) or {}
+    active_filters = data.get("filters") or {}
+    if not isinstance(active_filters, dict):
+        return jsonify({"error": "filters must be an object mapping column -> value"}), 400
+
     for col, value in active_filters.items():
         fc = filters_cfg.get(col)
         if not fc or value in (None, "", []):
@@ -166,7 +181,13 @@ def api_compute():
             and isinstance(value, (list, tuple))
             and len(value) == 2
         ):
-            lo, hi = value
+            try:
+                lo, hi = float(value[0]), float(value[1])
+            except (TypeError, ValueError):
+                return (
+                    jsonify({"error": f"filter {col!r} range bounds must be numeric"}),
+                    400,
+                )
             filtered_df = filtered_df[
                 (filtered_df[col] >= lo) & (filtered_df[col] <= hi)
             ]
@@ -224,7 +245,6 @@ def api_compute():
         ]
 
     # 3. Leaderboard (top_x rows)
-    top_x = int(data.get("top_x", 20))
     top_df = work_df.head(max(top_x, 0))
 
     leaderboard = []
@@ -240,7 +260,6 @@ def api_compute():
 
     # 4. Watchlist — resolved against the currently filtered+scored set
     watchlist = []
-    targets = [t.strip() for t in data.get("target_identifiers", []) if str(t).strip()]
     for target in targets:
         match = work_df[work_df[id_col].astype(str) == target]
         if not match.empty:

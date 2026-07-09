@@ -520,12 +520,15 @@ function renderModalContent(key) {
       <pre class="bg-[#121620] rounded-lg p-3 border border-slate-800 text-[11px] text-teal-400 font-mono overflow-x-auto">${pythonSnippet}</pre>
     </div>
   `;
-  // eslint-disable-next-line no-undef
-  katex.render(
-    LATEX_BY_TYPE[key] || "f(x) = x",
-    document.getElementById("modal-latex"),
-    { throwOnError: false },
-  );
+  const modalLatexEl = document.getElementById("modal-latex");
+  try {
+    // eslint-disable-next-line no-undef
+    katex.render(LATEX_BY_TYPE[key] || "f(x) = x", modalLatexEl, {
+      throwOnError: false,
+    });
+  } catch (e) {
+    modalLatexEl.textContent = LATEX_BY_TYPE[key] || "f(x) = x";
+  }
   document
     .getElementById("modal-copy-btn")
     .addEventListener("click", (e) => copyText(e.target, pythonSnippet));

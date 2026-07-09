@@ -302,6 +302,33 @@ def test_from_config_drops_stray_keys():
     assert t.params == {"w": 2.0}
 
 
+def test_from_config_non_dict_spec_raises():
+    with pytest.raises(ValueError, match="must be an object"):
+        wt.from_config("linear")
+
+
+def test_from_config_non_numeric_param_raises():
+    with pytest.raises(ValueError, match="must be numeric"):
+        wt.from_config({"type": "amplify", "power": "abc"})
+
+
+def test_from_config_nan_param_raises():
+    with pytest.raises(ValueError, match="must be finite"):
+        wt.from_config({"type": "linear", "w": float("nan")})
+
+
+def test_from_config_infinite_param_raises():
+    with pytest.raises(ValueError, match="must be finite"):
+        wt.from_config({"type": "linear", "w": float("inf")})
+
+
+def test_from_config_none_param_uses_factory_default():
+    # Explicit None for a nullable param behaves the same as omitting it.
+    t = wt.from_config({"type": "clamp", "min_v": None, "max_v": 0.5})
+    assert t.params["min_v"] is None
+    assert t.params["max_v"] == 0.5
+
+
 # ---------------------------------------------------------------------------
 # weighted_sum / vectorized_weighted_sum
 # ---------------------------------------------------------------------------

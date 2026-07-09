@@ -492,5 +492,24 @@ describe("Formula Rendering & Copy Actions", () => {
       // SVG curve calculation matches 41 distinct points
       expect(pts.length).toBe(41);
     });
+
+    it("handles katex rendering exception in the modal gracefully instead of leaving it broken", () => {
+      katexMock.render.mockImplementationOnce(() => {
+        throw new Error("Katex failure");
+      });
+
+      const btn = document.getElementById("transform-reference-btn");
+      btn.click();
+
+      // Falls back to raw latex text instead of throwing.
+      expect(document.getElementById("modal-latex").textContent).toBe(
+        "f(x) = w \\cdot x",
+      );
+
+      // The rest of renderModalContent still ran — the copy button listener
+      // got attached, so clicking it works instead of being dead.
+      const copyBtn = document.getElementById("modal-copy-btn");
+      expect(copyBtn).not.toBeNull();
+    });
   });
 });

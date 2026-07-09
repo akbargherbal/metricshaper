@@ -194,6 +194,16 @@ def test_popular_values_scope_narrows_results(client):
     assert "popular_values" in data
 
 
+def test_popular_values_unknown_scope_column_400(client):
+    """A scope_column that isn't a real dataframe column must not crash the
+    endpoint with a raw pandas KeyError — it should be a clean 400."""
+    resp = client.get(
+        "/api/popular_values?column=category&scope_column=nope&scope_value=x"
+    )
+    assert resp.status_code == 400
+    assert "error" in resp.get_json()
+
+
 def test_popular_values_hx_request_renders_fragment(client):
     resp = client.get(
         "/api/popular_values?column=category", headers={"HX-Request": "true"}
@@ -228,6 +238,59 @@ def test_compute_invalid_transform_type_400(client):
     )
     assert resp.status_code == 400
     assert "Invalid transform configuration" in resp.get_json()["error"]
+
+
+def test_compute_pipeline_not_a_list_400(client):
+    """A non-list pipeline (e.g. a bare int) must not crash on len()."""
+    resp = client.post("/api/compute", json={"pipeline": 5})
+    assert resp.status_code == 400
+    assert "error" in resp.get_json()
+
+
+def test_compute_non_numeric_transform_param_400(client):
+    """A non-numeric transform parameter must fail fast at the API boundary
+    instead of surfacing later as an opaque numpy TypeError."""
+    resp = client.post(
+        "/api/compute",
+        json={"pipeline": [{"type": "amplify", "power": "abc"}, {"type": "linear"}]},
+    )
+    assert resp.status_code == 400
+    assert "must be numeric" in resp.get_json()["error"]
+
+
+def test_compute_non_numeric_top_x_400(client):
+    resp = client.post(
+        "/api/compute", json={"pipeline": _valid_pipeline(), "top_x": "abc"}
+    )
+    assert resp.status_code == 400
+    assert "top_x" in resp.get_json()["error"]
+
+
+def test_compute_filters_not_an_object_400(client):
+    resp = client.post(
+        "/api/compute",
+        json={"pipeline": _valid_pipeline(), "filters": ["category", "Web"]},
+    )
+    assert resp.status_code == 400
+    assert "error" in resp.get_json()
+
+
+def test_compute_range_filter_non_numeric_bounds_400(client):
+    resp = client.post(
+        "/api/compute",
+        json={"pipeline": _valid_pipeline(), "filters": {"price": ["a", "b"]}},
+    )
+    assert resp.status_code == 400
+    assert "numeric" in resp.get_json()["error"]
+
+
+def test_compute_target_identifiers_not_a_list_400(client):
+    resp = client.post(
+        "/api/compute",
+        json={"pipeline": _valid_pipeline(), "target_identifiers": "Alpha"},
+    )
+    assert resp.status_code == 400
+    assert "error" in resp.get_json()
 
 
 def test_compute_categorical_filter_narrows_rows(client):
